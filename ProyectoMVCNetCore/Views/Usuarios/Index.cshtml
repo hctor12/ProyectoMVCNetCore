@@ -1,0 +1,187 @@
+@model List<Usuario>
+@{
+    ViewData["Title"] = "Gestión de Usuarios";
+}
+
+<!-- Header & Global Actions -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+    <div>
+        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Gestión de Usuarios</h2>
+        <p class="text-slate-500 mt-1">Control de acceso y seguridad de la plataforma.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        @*<form asp-action="MigrarSeguridad" method="post" onsubmit="return confirm('¿Regenerar el cifrado SHA512 para todos los usuarios?');">
+            <button type="submit" class="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all duration-300 flex items-center gap-2 group">
+                <span class="material-symbols-outlined text-xl group-hover:rotate-180 transition-transform duration-500">shield_lock</span>
+                <span class="text-xs font-bold uppercase tracking-tight hidden sm:block">Cifrado</span>
+            </button>
+        </form>*@
+        <a asp-action="Create" class="bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors duration-300">
+            <span class="material-symbols-outlined text-lg">person_add</span>
+            Nuevo Usuario
+        </a>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] != null)
+{
+    <div class="mb-8 p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold animate-in fade-in slide-in-from-top-4">
+        <span class="material-symbols-outlined text-[20px]">verified</span>
+        @TempData["Mensaje"]
+    </div>
+}
+
+<!-- Bento System: User List -->
+<div class="grid grid-cols-12 gap-8">
+    <!-- Main User Table Card -->
+    <div class="col-span-12 lg:col-span-12 bento-card rounded-3xl p-1 shadow-sm">
+        <div class="bg-white rounded-[1.4rem] overflow-hidden">
+            <div class="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-lg font-extrabold text-slate-900">Usuarios Registrados</h3>
+                <div class="flex gap-2">
+                    <span class="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest">Total: @Model.Count</span>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/50">
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">USUARIO</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">CORREO ELECTRÓNICO</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">ROL</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">ESTADO</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-black/5">
+                        @foreach (var user in Model)
+                        {
+                            <tr class="hover:bg-slate-50/30 transition-colors group">
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center gap-4">
+                                        <img src="~/uploads/@user.Imagen" class="h-10 w-10 rounded-full border border-black/10 object-cover" onerror="this.src='https://ui-avatars.com/api/?name=@user.Nombre&background=random'" />
+                                        <p class="text-sm font-bold text-slate-800">@user.Nombre</p>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <p class="text-xs font-medium text-slate-500">@user.Email</p>
+                                </td>
+                                <td class="px-8 py-6 text-center">
+                                    @{
+                                        string rolN = user.IdRol == 1 ? "Administrador" : user.IdRol == 2 ? "Técnico" : "Cliente";
+                                        string rolC = user.IdRol == 1 ? "bg-red-50 text-red-600 border-red-100" : user.IdRol == 2 ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-50 text-slate-600 border-slate-100";
+                                    }
+                                    <span class="px-3 py-1 text-[10px] font-black rounded-full border @rolC uppercase tracking-wider">
+                                        @rolN
+                                    </span>
+                                </td>
+                                <td class="px-8 py-6 text-center">
+                                    <span id="status-dot-@user.IdUsuario" data-id="@user.IdUsuario" class="status-dot h-2 w-2 rounded-full bg-red-400 inline-block transition-all duration-300" title="Desconectado"></span>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a asp-action="Edit" asp-route-id="@user.IdUsuario" class="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary transition-all">
+                                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                                        </a>
+                                        <button onclick="openDeleteModal(@user.IdUsuario, '@user.Nombre')" class="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all">
+                                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Simple Delete Modal -->
+<div id="deleteModal" class="fixed inset-0 z-[100] hidden">
+    <div class="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2.5rem] border border-black/10 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div class="p-10 text-center">
+                <div class="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <span class="material-symbols-outlined text-3xl">delete_forever</span>
+                </div>
+                <h3 class="text-xl font-black text-slate-900 mb-2">¿Eliminar usuario?</h3>
+                <p class="text-sm text-slate-500 font-medium mb-8">
+                    Estás a punto de eliminar a <span id="deleteUserName" class="font-bold text-slate-900"></span>. Esta acción no se puede deshacer.
+                </p>
+                <div class="flex items-center gap-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 py-4 bg-slate-50 text-slate-600 text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-100 transition-all duration-300">
+                        Cancelar
+                    </button>
+                    <form asp-action="Delete" method="post" class="flex-1">
+                        <input type="hidden" id="deleteIdUsuario" name="idUsuario" />
+                        <button type="submit" class="w-full py-4 bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-red-600 transition-all duration-300">
+                            Eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteIdUsuario').value = id;
+            document.getElementById('deleteUserName').textContent = name;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        // Cerrar al hacer clic fuera
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDeleteModal();
+        });
+
+        // SignalR Presence Logic
+        if (window.presenceConnection) {
+            function updateStatus(userId, isOnline) {
+                let dot = document.getElementById("status-dot-" + userId);
+                if (dot) {
+                    if (isOnline) {
+                        dot.className = "status-dot h-2 w-2 rounded-full bg-emerald-400 inline-block shadow-[0_0_8px_rgba(52,211,153,0.8)] transition-all duration-300";
+                        dot.title = "Conectado";
+                    } else {
+                        dot.className = "status-dot h-2 w-2 rounded-full bg-red-400 inline-block transition-all duration-300";
+                        dot.title = "Desconectado";
+                    }
+                }
+            }
+
+            window.presenceConnection.on("UserConnected", function (userId) {
+                updateStatus(userId, true);
+            });
+
+            window.presenceConnection.on("UserDisconnected", function (userId) {
+                updateStatus(userId, false);
+            });
+
+            async function fetchInitialStatuses() {
+                try {
+                    // Verificamos si la conexión está establecida, SignalR state => "Connected" es signalR.HubConnectionState.Connected
+                    if (window.presenceConnection.state === "Connected") {
+                        let users = await window.presenceConnection.invoke("GetOnlineUsers");
+                        users.forEach(u => updateStatus(u, true));
+                    } else {
+                        // Reintentar si aún está en "Connecting"
+                        setTimeout(fetchInitialStatuses, 500);
+                    }
+                } catch (err) {
+                    console.error("Error obteniendo usuarios en línea:", err);
+                }
+            }
+
+            fetchInitialStatuses();
+        }
+    </script>
+}

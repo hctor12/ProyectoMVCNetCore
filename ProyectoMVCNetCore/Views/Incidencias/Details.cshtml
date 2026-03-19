@@ -1,0 +1,488 @@
+﻿@model Incidencia
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Detalle de Incidencia";
+    int currentUserIdRol = int.Parse(User.FindFirstValue("IdRol") ?? "0");
+    int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
+    List<Comentario> comentarios = ViewData["Comentarios"] as List<Comentario> ?? new List<Comentario>();
+    List<Estado> estados = ViewData["Estados"] as List<Estado> ?? new List<Estado>();
+    List<Usuario> usuarios = ViewData["Usuarios"] as List<Usuario> ?? new List<Usuario>();
+    
+    Usuario? cliente = usuarios.FirstOrDefault(u => u.IdUsuario == Model.IdUsuarioCliente);
+    Usuario? tecnico = usuarios.FirstOrDefault(u => u.IdUsuario == Model.IdUsuarioTecnico);
+    Estado? estadoActual = estados.FirstOrDefault(e => e.IdEstado == Model.IdEstado);
+}
+
+<!-- Breadcrumbs & Header -->
+<div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-2 text-sm font-medium text-slate-500 mb-2">
+            <a asp-action="Index" class="hover:text-primary transition-colors">Tickets</a>
+            <span class="material-symbols-outlined text-xs">chevron_right</span>
+            <span class="text-primary">#@Model.IdIncidencia</span>
+        </div>
+        <h2 class="text-3xl font-extrabold tracking-tight text-slate-900">@Model.Titulo</h2>
+        <div class="mt-2 flex items-center gap-2.5">
+            @{
+                string colorE = Model.IdEstado == 1 ? "bg-amber-100 text-amber-700" : Model.IdEstado == 2 ? "bg-primary/10 text-primary" : "bg-emerald-100 text-emerald-700";
+            }
+            <span class="inline-flex items-center rounded-full @colorE px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                @(estadoActual?.NombreEstado ?? "Pendiente")
+            </span>
+            <span class="text-slate-300 font-bold">·</span>
+            <span class="text-sm text-slate-500">Reportado el @Model.FechaReporte.ToString("dd MMM, yyyy HH:mm").Replace(".", "")</span>
+        </div>
+    </div>
+    
+    <div class="flex gap-3">
+        @if (currentUserIdRol == 1 || currentUserIdRol == 2)
+        {
+            <style>
+                .select-clean {
+                    -webkit-appearance: none !important;
+                    -moz-appearance: none !important;
+                    appearance: none !important;
+                    background-image: none !important; /* Elimina flecha de Tailwind Forms */
+                    background-color: transparent !important;
+                }
+                .select-clean::-ms-expand { display: none !important; }
+                
+                /* Eliminar cualquier estilo de focus molesto */
+                .select-clean:focus {
+                    outline: none !important;
+                    box-shadow: none !important;
+                    border-color: rgba(15, 23, 42, 0.1) !important; /* slate-200 aprox */
+                }
+                
+                .status-arrow {
+                    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+                }
+                
+                /* La animación se activa cuando el select tiene el foco */
+                .select-clean:focus + .status-arrow {
+                    transform: translateY(-50%) rotate(180deg) !important;
+                }
+            </style>
+            <form asp-action="CambiarEstado" method="post" class="flex gap-2">
+                <input type="hidden" name="idIncidencia" value="@Model.IdIncidencia" />
+                <div class="relative flex items-center">
+                    <select name="idEstado" 
+                            onchange="this.blur()" 
+                            onclick="if(this.dataset.open === 'true') { this.blur(); } else { this.dataset.open = 'true'; }"
+                            onblur="this.dataset.open = 'false'"
+                            class="select-clean rounded-xl border border-slate-200 bg-white pl-4 pr-10 py-2 text-sm font-bold text-slate-700 cursor-pointer transition-all">
+                        @foreach (var est in estados)
+                        {
+                            <option value="@est.IdEstado" selected="@(est.IdEstado == Model.IdEstado)">@est.NombreEstado</option>
+                        }
+                    </select>
+                    <span class="status-arrow material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-lg">expand_more</span>
+                </div>
+                <button type="submit" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">Actualizar</button>
+            </form>
+        }
+
+        @if (Model.IdEstado == 3) // Finalizado
+        {
+            <a asp-action="DescargarResumen" asp-route-id="@Model.IdIncidencia" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-xl shadow-slate-200 flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95">
+                <span class="material-symbols-outlined text-lg">picture_as_pdf</span>
+                Descargar Resumen
+            </a>
+        }
+
+        @if (currentUserIdRol == 2 && Model.IdUsuarioTecnico == null && Model.IdEstado != 3)
+        {
+            <form asp-action="AtenderTicket" method="post">
+                <input type="hidden" name="idIncidencia" value="@Model.IdIncidencia" />
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-xl text-sm font-bold hover:brightness-110 shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined text-lg">fact_check</span>
+                    Atender Ticket
+                </button>
+            </form>
+        }
+
+        @if (currentUserId == Model.IdUsuarioCliente && Model.IdEstado != 3)
+        {
+            <button type="button" onclick="openCloseTicketModal()" class="bg-red-500 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-red-600 transition-all duration-300 flex items-center gap-2">
+                <span class="material-symbols-outlined text-lg">cancel</span>
+                Cerrar Ticket
+            </button>
+        }
+    </div>
+</div>
+
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-6">
+    <!-- Sidebar: Requester & Details -->
+    <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
+        <!-- Card: Requester -->
+        <div class="rounded-2xl bg-white p-6 border border-black/10">
+            <h3 class="text-[11px] font-bold uppercase tracking-widest text-black/40 mb-6 flex justify-between items-center">
+                Solicitante
+                <span class="material-symbols-outlined text-black/20 text-[18px]">person</span>
+            </h3>
+            <div class="flex items-center gap-4">
+                <img class="h-12 w-12 rounded-full border-2 border-slate-50 object-cover" src="~/uploads/@(cliente?.Imagen)" onerror="this.src='https://ui-avatars.com/api/?name=@(cliente?.Nombre)&background=0984E3&color=fff'" />
+                <div>
+                    <p class="font-bold text-slate-900 text-sm">@(cliente?.Nombre ?? "Usuario Desconocido")</p>
+                    <p class="text-[10px] text-slate-500 uppercase font-black">Cliente</p>
+                </div>
+            </div>
+            <div class="mt-6 pt-6 border-t border-black/5 space-y-3">
+                <div class="flex items-center gap-3 text-xs">
+                    <span class="material-symbols-outlined text-primary text-[16px]">mail</span>
+                    <span class="text-slate-600 font-medium">@(cliente?.Email)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card: Assigned Technician -->
+        <div class="rounded-2xl bg-white p-6 border border-black/10">
+            <h3 class="text-[11px] font-bold uppercase tracking-widest text-black/40 mb-6 flex justify-between items-center">
+                Técnico Asignado
+                <span class="material-symbols-outlined text-black/20 text-[18px]">support_agent</span>
+            </h3>
+            @if (tecnico != null)
+            {
+                <div class="flex items-center gap-4">
+                    <img class="h-12 w-12 rounded-full border-2 border-slate-50 object-cover" src="~/uploads/@tecnico.Imagen" onerror="this.src='https://ui-avatars.com/api/?name=@tecnico.Nombre&background=00CEC9&color=fff'" />
+                    <div>
+                        <p class="font-bold text-slate-900 text-sm">@tecnico.Nombre</p>
+                        <p class="text-[10px] text-slate-500 uppercase font-black">Especialista</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <span class="material-symbols-outlined text-slate-400">help</span>
+                    <span class="text-xs font-bold text-slate-400">Sin asignar</span>
+                </div>
+            }
+        </div>
+        
+        <!-- Card: Attachments -->
+        <div class="rounded-2xl bg-white p-6 border border-black/10">
+            <h3 class="text-[11px] font-bold uppercase tracking-widest text-black/40 mb-6 flex justify-between items-center">
+                Adjuntos
+                <span class="material-symbols-outlined text-black/20 text-[18px]">attachment</span>
+            </h3>
+            @if (!string.IsNullOrEmpty(Model.Fichero))
+            {
+                <div class="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3 hover:border-primary/30 hover:bg-white transition-all">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <span class="material-symbols-outlined">image</span>
+                        </div>
+                        <div class="overflow-hidden">
+                            <p class="text-[10px] font-bold text-slate-900 truncate">@Model.Fichero</p>
+                            <a href="~/uploads/@Model.Fichero" target="_blank" class="text-[9px] text-primary font-black uppercase tracking-tighter hover:underline">Ver Archivo</a>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="text-xs text-slate-400 italic text-center py-2">Sin archivos adjuntos</p>
+            }
+        </div>
+    </div>
+
+    <!-- Main Chat Interface -->
+    <div class="col-span-12 lg:col-span-9 flex flex-col h-[740px] rounded-2xl bg-white border border-black/10 overflow-hidden">
+        <!-- Chat Header -->
+        <div class="border-b border-slate-100 px-6 py-5 flex items-center justify-between bg-slate-50/30">
+            <div class="flex items-center gap-2">
+                <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <h3 class="font-bold text-slate-900">Conversación Activa</h3>
+            </div>
+            <div id="connectionStatus" class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
+                Desconectado
+            </div>
+        </div>
+
+        <!-- Content & Comments -->
+        <div id="commentsContainer" class="flex-1 overflow-y-auto p-8 space-y-8">
+            <!-- Ticket Original Description -->
+            <div class="bg-black/[0.02] rounded-2xl p-6 border border-black/5 shadow-sm">
+                <p class="text-[10px] font-black uppercase text-black/40 mb-3 tracking-widest">Descripción Inicial</p>
+                <p class="text-sm leading-relaxed text-slate-700">@Model.Descripcion</p>
+            </div>
+
+            <!-- Comments Timeline -->
+            <div id="commentsList" class="space-y-8">
+                @foreach (var com in comentarios)
+                {
+                    var userCom = usuarios.FirstOrDefault(u => u.IdUsuario == com.IdUsuario);
+                    bool isMe = com.IdUsuario == currentUserId;
+                    
+                    <div class="flex @(isMe ? "flex-row-reverse" : "") gap-4 max-w-[85%] @(isMe ? "ml-auto" : "")">
+                        <img class="h-9 w-9 shrink-0 rounded-xl object-cover" src="~/uploads/@userCom?.Imagen" onerror="this.src='https://ui-avatars.com/api/?name=@(userCom?.Nombre)&background=@(isMe ? "0984E3" : "64748b")&color=fff'" />
+                        <div class="flex flex-col space-y-1.5 @(isMe ? "items-end text-right" : "items-start")">
+                            <div class="w-fit rounded-2xl @(isMe ? "rounded-tr-none bg-black text-white" : "rounded-tl-none bg-black/[0.04] text-slate-700 border border-black/5") p-4 text-sm leading-relaxed">
+                                @com.Contenido
+                            </div>
+                            <p class="text-[10px] font-bold text-slate-400 px-1">@(userCom?.Nombre) • @com.Fecha.ToString("HH:mm")</p>
+                        </div>
+                    </div>
+                }
+            </div>
+            
+            @if (!comentarios.Any())
+            {
+                <div id="noCommentsMessage" class="text-center py-10">
+                    <span class="material-symbols-outlined text-slate-200 text-5xl">chat_bubble</span>
+                    <p class="text-slate-400 text-xs mt-2 italic">Aún no hay mensajes en este ticket</p>
+                </div>
+            }
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-6 border-t border-black/5 bg-black/[0.01]">
+            <div id="typingIndicator" class="hidden mb-3 pl-2 flex items-center gap-2 text-[11px] font-black tracking-widest text-primary animate-in fade-in duration-300">
+                <span class="material-symbols-outlined text-[16px] animate-pulse">edit</span>
+                <span id="typingText">X está escribiendo...</span>
+            </div>
+            @if (Model.IdEstado == 3)
+            {
+                <div class="flex items-center justify-center gap-3 py-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span class="material-symbols-outlined text-slate-400">lock</span>
+                    <p class="text-sm font-bold text-slate-400 italic">Esta incidencia está cerrada y no acepta nuevos mensajes.</p>
+                </div>
+            }
+            else
+            {
+                <form id="commentForm" asp-action="AddComentario" method="post" class="relative flex items-center bg-white rounded-2xl border border-black/10 p-1.5 focus-within:ring-2 ring-black/5 transition-all">
+                    <input type="hidden" name="idIncidencia" value="@Model.IdIncidencia" />
+                    <input id="commentInput" autocomplete="off" name="contenido" class="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-4 text-slate-900" placeholder="Escribe un mensaje de seguimiento..." type="text" required />
+                    <button type="submit" class="flex h-11 w-11 items-center justify-center rounded-xl bg-black text-white hover:brightness-110 transition-all">
+                        <span class="material-symbols-outlined">send</span>
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmación Cerrar Ticket -->
+<div id="closeTicketModal" class="fixed inset-0 z-[100] hidden">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div id="modalContentClose" class="relative w-full max-w-md bg-white rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-red-100/50">
+                    <span class="material-symbols-outlined text-red-500 text-4xl">warning</span>
+                </div>
+                <h3 class="text-2xl font-black text-slate-900 mb-2">¿Cerrar esta incidencia?</h3>
+                <p class="text-slate-500 text-sm font-medium leading-relaxed mb-10 px-4">
+                    Al cerrar la incidencia indicas que el problema ha sido resuelto. <br/> 
+                    <span class="font-bold text-slate-700">Ya no podrás añadir más comentarios.</span>
+                </p>
+                <div class="flex flex-col w-full gap-3">
+                    <form asp-action="CerrarTicket" method="post">
+                        <input type="hidden" name="idIncidencia" value="@Model.IdIncidencia" />
+                        <button type="submit" class="w-full py-4 bg-red-500 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-600 transition-all duration-300 active:scale-95">
+                            Sí, cerrar incidencia
+                        </button>
+                    </form>
+                    <button type="button" onclick="closeCloseTicketModal()" class="w-full py-4 bg-slate-50 text-slate-500 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-slate-100 transition-all duration-300 active:scale-95">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script>
+        const ticketId = "@Model.IdIncidencia";
+        const myId = "@currentUserId";
+        const myName = "@(usuarios.FirstOrDefault(u => u.IdUsuario == currentUserId)?.Nombre ?? "Usuario")";
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/incidenciasHub")
+            .withAutomaticReconnect()
+            .build();
+
+        async function start() {
+            try {
+                await connection.start();
+                updateStatus(true);
+                await connection.invoke("JoinTicketGroup", parseInt(ticketId));
+            } catch (err) {
+                console.error(err);
+                setTimeout(start, 5000);
+            }
+        };
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('connectionStatus');
+            if (!statusDiv) return;
+            if (connected) {
+                statusDiv.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Online';
+                statusDiv.classList.remove('text-slate-400');
+                statusDiv.classList.add('text-emerald-500');
+            } else {
+                statusDiv.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span> Offline';
+                statusDiv.classList.add('text-slate-400');
+                statusDiv.classList.remove('text-emerald-500');
+            }
+        }
+
+        connection.onclose(async () => {
+            updateStatus(false);
+            await start();
+        });
+
+        connection.on("ReceiveComment", (userId, userName, userImagen, contenido, fecha) => {
+            const isMe = userId.toString() === myId;
+            
+            // Ocultar mensaje de "sin comentarios" si existe
+            const noMsg = document.getElementById('noCommentsMessage');
+            if (noMsg) noMsg.remove();
+
+            const commentsList = document.getElementById('commentsList');
+            const newComment = document.createElement('div');
+            newComment.className = `flex ${isMe ? "flex-row-reverse" : ""} gap-4 max-w-[85%] ${isMe ? "ml-auto" : ""} animate-in fade-in slide-in-from-bottom-2`;
+            
+            newComment.innerHTML = `
+                <img class="h-9 w-9 shrink-0 rounded-xl object-cover" src="/uploads/${userImagen}" onerror="this.src='https://ui-avatars.com/api/?name=${userName}&background=${isMe ? "0984E3" : "64748b"}&color=fff'" />
+                <div class="flex flex-col space-y-1.5 ${isMe ? "items-end text-right" : "items-start"}">
+                    <div class="w-fit rounded-2xl ${isMe ? "rounded-tr-none bg-black text-white" : "rounded-tl-none bg-black/[0.04] text-slate-700 border border-black/5"} p-4 text-sm leading-relaxed">
+                        ${contenido}
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 px-1">${userName} • ${fecha}</p>
+                </div>
+            `;
+            
+            commentsList.appendChild(newComment);
+            
+            // Scroll to bottom
+            const container = document.getElementById('commentsContainer');
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
+
+        // Typing Indicator Logic
+        let typingTimeout = null;
+        let typers = new Map();
+
+        function updateTypingUI() {
+            const indicator = document.getElementById('typingIndicator');
+            const typingText = document.getElementById('typingText');
+            if (!indicator || !typingText) return;
+
+            if (typers.size === 0) {
+                indicator.classList.add('hidden');
+            } else {
+                indicator.classList.remove('hidden');
+                let names = Array.from(typers.keys());
+                let text = names.length > 1 ? `${names.join(', ')} están escribiendo...` : `${names[0]} está escribiendo...`;
+                typingText.textContent = text;
+                scrollToBottom();
+            }
+        }
+
+        connection.on("UserTyping", (userName) => {
+            if (typers.has(userName)) clearTimeout(typers.get(userName));
+            let timeout = setTimeout(() => {
+                typers.delete(userName);
+                updateTypingUI();
+            }, 1200);
+            typers.set(userName, timeout);
+            updateTypingUI();
+        });
+
+        connection.on("UserStoppedTyping", (userName) => {
+            if (typers.has(userName)) {
+                clearTimeout(typers.get(userName));
+                typers.delete(userName);
+                updateTypingUI();
+            }
+        });
+
+        const commentInputEl = document.getElementById('commentInput');
+        if (commentInputEl) {
+            commentInputEl.addEventListener('input', () => {
+                if (connection.state === "Connected") {
+                    connection.invoke("NotifyTyping", parseInt(ticketId), myName).catch(err => console.error(err));
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(() => {
+                        if (connection.state === "Connected") {
+                            connection.invoke("NotifyStoppedTyping", parseInt(ticketId), myName).catch(err => console.error(err));
+                        }
+                    }, 600);
+                }
+            });
+        }
+
+        connection.on("ReceiveStatusUpdate", (statusId, statusName) => {
+            // Recargar la página para aplicar todos los cambios de UI (formularios bloqueados, botones desaparecidos, etc)
+            // Esto asegura que la lógica del servidor (Razor) y la del cliente estén sincronizadas.
+            window.location.reload();
+        });
+
+        function scrollToBottom() {
+            const container = document.getElementById('commentsContainer');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('commentInput');
+            const contenido = input.value;
+            if (!contenido.trim()) return;
+
+            if (connection.state === "Connected") {
+                clearTimeout(typingTimeout);
+                connection.invoke("NotifyStoppedTyping", parseInt(ticketId), myName).catch(console.error);
+            }
+
+            const formData = new FormData(this);
+            input.value = '';
+
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) {
+                    console.error("Error en la respuesta");
+                    input.value = contenido;
+                }
+            } catch (err) {
+                console.error("Error enviando:", err);
+                input.value = contenido; 
+            }
+        });
+
+        // Modal Cerrar Ticket logic
+        function openCloseTicketModal() {
+            document.getElementById('closeTicketModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCloseTicketModal() {
+            document.getElementById('closeTicketModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Cerrar modal al hacer clic fuera
+        const closeTicketModalOverlay = document.getElementById('closeTicketModal');
+        closeTicketModalOverlay.addEventListener('mousedown', (e) => {
+            if (e.target === closeTicketModalOverlay) {
+                closeCloseTicketModal();
+            }
+        });
+        
+        start();
+        setTimeout(scrollToBottom, 50);
+    </script>
+}

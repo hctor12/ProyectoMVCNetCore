@@ -1,0 +1,335 @@
+﻿@using System.Security.Claims
+@{
+    ViewData["Title"] = "Perfil de Usuario";
+    int currentUserIdRol = int.Parse(User.FindFirstValue("IdRol") ?? "0");
+    int currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
+}
+
+<div class="max-w-4xl mx-auto py-10">
+    <!-- Profile Header Card -->
+    <div class="bento-card rounded-[2.5rem] overflow-hidden mb-8">
+        
+        <form id="profileForm" asp-action="UpdateImagen" method="post" enctype="multipart/form-data" class="w-full">
+            <input type="hidden" name="idUsuario" value="@Model.IdUsuario" />
+            
+            <div class="px-10 pb-10 pt-10 relative flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
+                <div class="relative group">
+                    <img id="profile-img" src="~/uploads/@Model.Imagen" class="w-32 h-32 rounded-3xl border-4 border-white object-cover shadow-2xl transition-all duration-300" onerror="this.src='https://ui-avatars.com/api/?name=@Model.Nombre&size=128&background=0984E3&color=fff'" />
+                    
+                    @if (currentUserId == Model.IdUsuario)
+                    {
+                        <label for="avatarInput" class="absolute inset-0 bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                            <span class="material-symbols-outlined text-white text-3xl">photo_camera</span>
+                        </label>
+                        <input id="avatarInput" name="imagen" type="file" class="hidden" accept="image/*" onchange="previewImage(this)" />
+                    }
+                </div>
+                <div class="flex-1 mb-2">
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tight">@Model.Nombre</h2>
+                    <div class="flex flex-wrap justify-center md:justify-start items-center gap-3 mt-2">
+                        @{
+                            string rolN = Model.IdRol == 1 ? "Administrador" : Model.IdRol == 2 ? "Técnico" : "Cliente";
+                            string rolC = Model.IdRol == 1 ? "bg-red-50 text-red-600" : Model.IdRol == 2 ? "bg-primary/10 text-primary" : "bg-slate-50 text-slate-500";
+                        }
+                        <span class="px-3 py-1 text-[10px] font-black rounded-full @rolC border border-current/10 uppercase tracking-widest">@rolN</span>
+                        <span class="text-slate-400 font-medium text-sm">ID: #@Model.IdUsuario</span>
+                    </div>
+                </div>
+                <div class="flex gap-3 mb-2">
+                    <button id="cancelBtn" type="button" onclick="cancelImageChange()" class="hidden px-6 py-3 rounded-2xl text-sm font-bold border border-slate-200 text-slate-400 hover:bg-slate-50 transition-all">
+                        Cancelar
+                    </button>
+                    <button id="submitBtn" type="button" onclick="handleEditClick()" class="bg-slate-100 text-slate-400 px-6 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 cursor-not-allowed">
+                        <span id="btnIcon" class="material-symbols-outlined text-lg">edit</span>
+                        <span id="btnText">Editar Perfil</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Info Column -->
+        <div class="md:col-span-2 space-y-8">
+            <div class="bento-card rounded-3xl p-8">
+                <h3 class="text-lg font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">contact_mail</span>
+                    Información de Contacto
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Correo Electrónico</p>
+                        <p class="font-bold text-slate-800">@Model.Email</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Nombre Completo</p>
+                        <p class="font-bold text-slate-800">@Model.Nombre</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bento-card rounded-3xl p-8">
+                <h3 class="text-lg font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-emerald-500">lock_open</span>
+                    Seguridad de la Cuenta
+                </h3>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100 gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white rounded-xl shadow-sm text-emerald-500 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[22px] leading-none">key</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-800">Contraseña de acceso</p>
+                            <p class="text-xs text-slate-500">Mantén tu cuenta protegida con una contraseña fuerte.</p>
+                        </div>
+                    </div>
+                    <button onclick="openPasswordModal()" class="w-full sm:w-auto px-5 py-3 bg-white border border-slate-200 text-slate-900 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-slate-900 hover:text-white transition-all duration-300 shadow-sm">
+                        Cambiar Contraseña
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Column -->
+        <div class="space-y-8">
+            <div class="bento-card rounded-3xl p-8 bg-slate-900 text-white relative overflow-hidden">
+                <div class="relative z-10">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Métricas de Usuario</h4>
+                    <div class="space-y-6">
+                        <div>
+                            <p class="text-2xl font-black">@ViewData["TotalIncidencias"]</p>
+                            <p class="text-xs text-slate-400 font-medium">Incidencias reportadas</p>
+                            <div class="w-full bg-slate-800 h-1.5 mt-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full transition-all duration-1000" style="width: @ViewData["Satisfaccion"]%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-black">@ViewData["Satisfaccion"]%</p>
+                            <p class="text-xs text-slate-400 font-medium">Índice de resolución</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="absolute -right-12 -bottom-12 w-32 h-32 bg-primary/20 rounded-full blur-3xl"></div>
+            </div>
+
+            <div class="bento-card rounded-3xl p-6 text-center">
+                <p class="text-xs text-slate-400 font-bold mb-4">¿Necesitas ayuda con tu cuenta?</p>
+                <a asp-controller="Incidencias" asp-action="Create" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">
+                    Soporte de Cuenta
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Toast Notification -->
+@if (TempData["Mensaje"] != null)
+{
+    <div id="successToast" class="fixed bottom-10 right-10 bg-slate-900 border border-white/10 text-white px-6 py-4 rounded-[2rem] shadow-2xl z-[300] flex items-center gap-4 animate-in slide-in-from-right-full duration-500">
+        <div class="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shrink-0">
+            <span class="material-symbols-outlined">check_circle</span>
+        </div>
+        <p class="text-sm font-bold pr-4">@TempData["Mensaje"]</p>
+        <button onclick="this.parentElement.remove()" class="text-slate-500 hover:text-white transition-colors">
+            <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+    </div>
+    <script>
+        setTimeout(() => {
+            const toast = document.getElementById('successToast');
+            if (toast) {
+                toast.classList.add('animate-out', 'fade-out', 'slide-out-to-right-full');
+                setTimeout(() => toast.remove(), 500);
+            }
+        }, 5000);
+    </script>
+}
+
+<!-- Password Change Modal -->
+<div id="passwordModal" class="@(TempData["Error"] != null ? "" : "hidden") fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+    <div id="modalContent" class="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-300">
+        <div class="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div>
+                <h3 class="text-xl font-black text-slate-900">Cambiar Contraseña</h3>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Seguridad de la cuenta</p>
+            </div>
+            <button onclick="closePasswordModal()" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-slate-900 transition-all shadow-sm">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        
+        <form asp-action="ChangePassword" method="post" id="passForm" onsubmit="return validatePasswords(event)">
+            <input type="hidden" name="idUsuario" value="@Model.IdUsuario" />
+            <div class="p-8 space-y-5">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña Actual</label>
+                    <div class="relative group/pass">
+                        <input type="password" name="oldPassword" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all font-medium pr-14" placeholder="••••••••" />
+                        <button type="button" onclick="togglePasswordVisibility(this)" class="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                            <span class="material-symbols-outlined text-xl">visibility</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="h-px bg-slate-100 my-2"></div>
+
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nueva Contraseña</label>
+                    <div class="relative group/pass">
+                        <input type="password" id="newPass" name="newPassword" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all font-medium pr-14" placeholder="••••••••" />
+                        <button type="button" onclick="togglePasswordVisibility(this)" class="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                            <span class="material-symbols-outlined text-xl">visibility</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirmar Nueva Contraseña</label>
+                    <div class="relative group/pass">
+                        <input type="password" id="confirmPass" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all font-medium pr-14" placeholder="••••••••" />
+                        <button type="button" onclick="togglePasswordVisibility(this)" class="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                            <span class="material-symbols-outlined text-xl">visibility</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Client and Server Errors -->
+                <div id="passError" class="@(TempData["Error"] != null ? "" : "hidden") p-4 bg-red-50 rounded-2xl border border-red-100 flex items-center gap-3 text-red-600 text-xs font-bold animate-in fade-in slide-in-from-top-2">
+                    <span class="material-symbols-outlined text-lg">error</span>
+                    <span id="errorText">@TempData["Error"]</span>
+                </div>
+            </div>
+
+            <div class="p-8 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <button type="button" onclick="closePasswordModal()" class="flex-1 py-4 text-sm font-bold text-slate-500 hover:bg-white rounded-2xl transition-all border border-transparent">
+                    Cancelar
+                </button>
+                <button type="submit" class="flex-1 py-4 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95">
+                    Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let imageChanged = false;
+        const originalImage = "@Url.Content($"~/uploads/{Model.Imagen}")";
+
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profile-img').src = e.target.result;
+                    markAsChanged();
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function cancelImageChange() {
+            document.getElementById('profile-img').src = originalImage;
+            document.getElementById('avatarInput').value = "";
+            imageChanged = false;
+            
+            const btn = document.getElementById('submitBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+
+            btn.classList.add('bg-slate-100', 'text-slate-400', 'cursor-not-allowed');
+            btn.classList.remove('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/30', 'hover:scale-105', 'active:scale-95');
+            btn.type = "button";
+            btnText.textContent = "Editar Perfil";
+            btnIcon.textContent = "edit";
+            cancelBtn.classList.add('hidden');
+        }
+
+        function markAsChanged() {
+            imageChanged = true;
+            const btn = document.getElementById('submitBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+
+            btn.classList.remove('bg-slate-100', 'text-slate-400', 'cursor-not-allowed');
+            btn.classList.add('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/30', 'hover:scale-105', 'active:scale-95');
+            btn.type = "submit";
+            btnText.textContent = "Actualizar Perfil";
+            btnIcon.textContent = "verified";
+            cancelBtn.classList.remove('hidden');
+            btn.removeAttribute('disabled');
+        }
+
+        function handleEditClick() {
+            if (imageChanged) {
+                document.getElementById('profileForm').submit();
+            }
+        }
+
+        // Password Modal Logic
+        let isMouseDownOnModal = false;
+
+        function openPasswordModal() {
+            document.getElementById('passwordModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+            document.body.style.overflow = '';
+            document.getElementById('passError').classList.add('hidden');
+            document.getElementById('passForm').reset();
+        }
+
+        function validatePasswords(e) {
+            const newPass = document.getElementById('newPass').value;
+            const confirmPass = document.getElementById('confirmPass').value;
+            const errorDiv = document.getElementById('passError');
+            const errorText = document.getElementById('errorText');
+
+            if (newPass !== confirmPass) {
+                errorText.textContent = "Las contraseñas no coinciden.";
+                errorDiv.classList.remove('hidden');
+                return false;
+            }
+
+            if (newPass.length < 4) {
+                errorText.textContent = "La contraseña es muy corta (mínimo 4 caracteres).";
+                errorDiv.classList.remove('hidden');
+                return false;
+            }
+
+            return true;
+        }
+
+        function togglePasswordVisibility(btn) {
+            const input = btn.parentElement.querySelector('input');
+            const icon = btn.querySelector('span');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        // Improved background click handling to avoid closure during text selection
+        const modalOverlay = document.getElementById('passwordModal');
+        const modalContent = document.getElementById('modalContent');
+
+        modalOverlay.addEventListener('mousedown', (e) => {
+            if (e.target === modalOverlay) isMouseDownOnModal = true;
+        });
+
+        modalOverlay.addEventListener('mouseup', (e) => {
+            if (e.target === modalOverlay && isMouseDownOnModal) {
+                closePasswordModal();
+            }
+            isMouseDownOnModal = false;
+        });
+    </script>
+}

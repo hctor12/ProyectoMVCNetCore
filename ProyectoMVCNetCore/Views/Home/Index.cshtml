@@ -1,0 +1,210 @@
+﻿@model List<Incidencia>
+@using ProyectoMVCNetCore.Models
+@{
+    ViewData["Title"] = "Dashboard";
+    int pendientes = (int)(ViewData["Pendientes"] ?? 0);
+    int enProceso = (int)(ViewData["EnProceso"] ?? 0);
+    int finalizadas = (int)(ViewData["Finalizadas"] ?? 0);
+    int total = (int)(ViewData["Total"] ?? 0);
+    List<Estado> estados = ViewData["Estados"] as List<Estado> ?? new List<Estado>();
+    List<Usuario> tecnicos = ViewData["Tecnicos"] as List<Usuario> ?? new List<Usuario>();
+    bool isTecnico = ViewData["IsTecnico"] as bool? ?? false;
+    
+    // Calcular porcentajes reales para ambos roles
+    int porcPendientes = total > 0 ? (pendientes * 100 / total) : 0;
+    int porcResueltos = total > 0 ? (finalizadas * 100 / total) : 0;
+}
+
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">@(isTecnico ? "Mi Panel de Trabajo" : "Dashboard General")</h1>
+    <p class="text-slate-500 mt-1">Resumen de actividad para hoy, @DateTime.Now.ToString("dd MMMM")</p>
+</header>
+
+<!-- Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
+    <!-- Metric Cards -->
+    <div class="bento-card bento-card-interactive col-span-1 md:col-span-2 lg:col-span-3 p-6 rounded-2xl flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+            <div class="w-11 h-11 bg-orange-50 text-orange-500 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px] leading-none">pending_actions</span>
+            </div>
+            <span class="text-xs font-semibold px-2 py-1 bg-orange-50 text-orange-600 rounded-full">Pendientes</span>
+        </div>
+        <div class="mt-4">
+            <p class="text-slate-500 text-sm font-medium">Por Atender</p>
+            <h3 class="text-3xl font-bold mt-1 tracking-tight text-slate-900">@pendientes</h3>
+        </div>
+    </div>
+    
+    <div class="bento-card bento-card-interactive col-span-1 md:col-span-2 lg:col-span-3 p-6 rounded-2xl flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+            <div class="w-11 h-11 bg-primary/5 text-primary rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px] leading-none">rotate_right</span>
+            </div>
+            <span class="text-xs font-semibold px-2 py-1 bg-primary/5 text-primary rounded-full">En Proceso</span>
+        </div>
+        <div class="mt-4">
+            <p class="text-slate-500 text-sm font-medium">Activos</p>
+            <h3 class="text-3xl font-bold mt-1 tracking-tight text-slate-900">@enProceso</h3>
+        </div>
+    </div>
+
+    <div class="bento-card bento-card-interactive col-span-1 md:col-span-2 lg:col-span-3 p-6 rounded-2xl flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+            <div class="w-11 h-11 bg-cyan-50 text-accent-cyan rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px] leading-none">task_alt</span>
+            </div>
+            <span class="text-xs font-semibold px-2 py-1 bg-cyan-50 text-accent-cyan rounded-full">Finalizados</span>
+        </div>
+        <div class="mt-4">
+            <p class="text-slate-500 text-sm font-medium">Completados</p>
+            <h3 class="text-3xl font-bold mt-1 tracking-tight text-slate-900">@finalizadas</h3>
+        </div>
+    </div>
+
+    <div class="bento-card bento-card-interactive col-span-1 md:col-span-2 lg:col-span-3 p-6 rounded-2xl flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+            <div class="w-11 h-11 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-[24px] leading-none">analytics</span>
+            </div>
+            <span class="text-xs font-semibold px-2 py-1 bg-blue-50 text-blue-600 rounded-full">Total</span>
+        </div>
+        <div class="mt-4">
+            <p class="text-slate-500 text-sm font-medium">@(isTecnico ? "Mis Tickets" : "Tickets Totales")</p>
+            <h3 class="text-3xl font-bold mt-1 tracking-tight text-slate-900">@total</h3>
+        </div>
+    </div>
+
+    <!-- Main Bento: Urgent Tickets Table -->
+    <div class="bento-card col-span-1 md:col-span-4 lg:col-span-8 p-6 rounded-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2 text-slate-900">
+                <span class="material-symbols-outlined text-@(isTecnico ? "primary" : "red-500") text-2xl">@(isTecnico ? "assignment" : "emergency")</span>
+                @(isTecnico ? "Mis Tareas" : "Tickets Urgentes")
+            </h2>
+            <a href="/Incidencias" @(isTecnico ? "onclick=setTechFilters(event)" : "") class="text-primary text-sm font-semibold hover:opacity-80 transition-opacity">Ver todos</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="text-black/40 text-[10px] uppercase tracking-widest border-b border-black/10">
+                        <th class="pb-4 font-bold">ID</th>
+                        <th class="pb-4 font-bold">TITULO</th>
+                        <th class="pb-4 font-bold">ESTADO</th>
+                        <th class="pb-4 font-bold text-right">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-black/5">
+                    @foreach (var item in Model)
+                    {
+                        <tr class="group hover:bg-slate-50/50 transition-colors">
+                            <td class="py-4 text-slate-400 font-mono text-xs">#@item.IdIncidencia</td>
+                            <td class="py-4">
+
+                                <p class="font-bold text-sm text-slate-800">@item.Titulo</p>
+                                <p class="text-[10px] text-slate-400">@item.FechaReporte.ToString("dd/MM/yyyy HH:mm")</p>
+                            </td>
+                            <td class="py-4">
+                                @{
+                                    string colorC = item.IdEstado == 1 ? "bg-orange-100 text-orange-600" : "bg-primary/10 text-primary";
+                                    string estadoN = estados.FirstOrDefault(e => e.IdEstado == item.IdEstado)?.NombreEstado ?? "Pendiente";
+                                }
+                                <span class="px-3 py-1 rounded-full text-[10px] font-bold @colorC uppercase tracking-wider">@estadoN</span>
+                            </td>
+                            <td class="py-4 text-right">
+                                <a asp-controller="Incidencias" asp-action="Details" asp-route-id="@item.IdIncidencia" class="w-9 h-9 inline-flex items-center justify-center rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px] leading-none">visibility</span>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="py-12 text-center text-slate-400 italic text-sm">No hay tickets urgentes pendientes</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Side Bento: Stats Distribution -->
+    <div class="bento-card col-span-1 md:col-span-2 lg:col-span-4 p-6 rounded-2xl flex flex-col">
+        <h2 class="text-xl font-bold mb-6 text-slate-900">@(isTecnico ? "Mi Rendimiento" : "Distribución")</h2>
+        
+        <div class="space-y-6 flex-1">
+            <div>
+                <div class="flex justify-between text-xs font-bold text-slate-600 mb-2">
+                    <span>@(isTecnico ? "Tasa de Resolución" : "Pendientes")</span>
+                    <span>@(isTecnico ? porcResueltos : porcPendientes)%</span>
+                </div>
+                <div class="w-full bg-black/5 h-2 rounded-full overflow-hidden border border-black/5">
+                    <div class="bg-black/80 h-full rounded-full" style="width: @(isTecnico ? porcResueltos : porcPendientes)%"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-8">
+                @if (isTecnico)
+                {
+                    <div class="p-4 bg-white rounded-2xl border border-black/10">
+                        <p class="text-[10px] font-bold text-black/40 uppercase tracking-widest">En Proceso</p>
+                        <h4 class="text-2xl font-black text-black">@enProceso</h4>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-4 bg-white rounded-2xl border border-black/10">
+                        <p class="text-[10px] font-bold text-black/40 uppercase tracking-widest">Técnicos</p>
+                        <h4 class="text-2xl font-black text-black">@tecnicos.Count</h4>
+                    </div>
+                }
+                <div class="p-4 bg-white rounded-2xl border border-black/10">
+                    <p class="text-[10px] font-bold text-black/40 uppercase tracking-widest">Resueltos</p>
+                    <h4 class="text-2xl font-black text-black">@finalizadas</h4>
+                </div>
+            </div>
+        </div>
+
+        @*
+        <a asp-controller="Incidencias" asp-action="Create" class="mt-8 w-full py-4 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 text-center">
+            Reportar Incidencia
+        </a>
+        *@
+    </div>
+</div>
+
+@if (isTecnico)
+{
+    <script>
+        function setTechFilters(e) {
+            sessionStorage.setItem('filter_assignment', 'mine');
+            sessionStorage.setItem('filter_state', '2');
+        }
+    </script>
+}
+
+@section Scripts {
+    <script>
+        if (window.presenceConnection) {
+            window.presenceConnection.on("RefreshDashboard", function() {
+                fetch(window.location.href)
+                    .then(res => res.text())
+                    .then(html => {
+                        let parser = new DOMParser();
+                        let doc = parser.parseFromString(html, 'text/html');
+                        
+                        let currentGrid = document.querySelector('.grid');
+                        let newGrid = doc.querySelector('.grid');
+                        
+                        if (currentGrid && newGrid) {
+                            currentGrid.innerHTML = newGrid.innerHTML;
+                        }
+                    })
+                    .catch(err => console.error("Error updating dashboard:", err));
+            });
+        }
+    </script>
+}
+

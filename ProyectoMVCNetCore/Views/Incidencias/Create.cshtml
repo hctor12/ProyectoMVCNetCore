@@ -1,0 +1,70 @@
+@{
+    ViewData["Title"] = "Nuevo Ticket";
+}
+
+<div class="max-w-4xl mx-auto pb-10">
+    <!-- Navigation & Header -->
+    <div class="mb-8">
+        <a asp-action="Index" class="text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-2 text-sm font-bold mb-4">
+            <span class="material-symbols-outlined text-lg">arrow_back</span>
+            Volver al listado
+        </a>
+        <h2 class="text-4xl font-black text-slate-900 tracking-tight">Reportar Incidencia</h2>
+        <p class="text-slate-500 font-medium mt-1">Nuestro equipo técnico revisará tu caso en breve.</p>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="bento-card rounded-[2.5rem] overflow-hidden">
+        <form asp-action="Create" method="post" enctype="multipart/form-data" class="p-10">
+            <div class="space-y-8">
+                <!-- Título -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Título de la Incidencia</label>
+                    <div class="relative group">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">title</span>
+                        <input name="titulo" required class="w-full pl-12 pr-5 py-4 bg-slate-50 border border-black/5 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-bold" placeholder="Ej: No funciona el acceso VPN" type="text" />
+                    </div>
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Descripción Detallada</label>
+                    <div class="relative group">
+                        <span class="absolute left-4 top-6 material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">subject</span>
+                        <textarea name="descripcion" required class="w-full pl-12 pr-5 py-4 bg-slate-50 border border-black/5 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all resize-none min-h-[160px] font-bold" placeholder="Explica detalladamente qué ha sucedido..." rows="5"></textarea>
+                    </div>
+                </div>
+
+                <!-- Archivo Adjunto -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Evidencia (Opcional)</label>
+                    <label for="fichero" class="relative block group cursor-pointer">
+                        <input type="file" name="fichero" id="fichero" class="hidden" onchange="updateFileName(this)" />
+                        <div class="border-2 border-dashed border-black/10 rounded-[1.5rem] p-8 flex flex-col items-center justify-center bg-slate-50 group-hover:bg-white group-hover:border-primary/50 transition-all duration-300">
+                            <span class="material-symbols-outlined text-slate-400 text-3xl mb-2 group-hover:scale-110 transition-transform">cloud_upload</span>
+                            <p class="text-xs font-black text-slate-900" id="fileName">Haz clic para subir o arrastra un archivo</p>
+                            <p id="file-sub" class="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-tighter">Imagen o PDF (máx 10MB)</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Submit -->
+                <div class="pt-6 border-t border-black/5">
+                    <button class="w-full py-5 bg-black hover:bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-3 text-lg active:scale-[0.98]" type="submit">
+                        Enviar Incidencia
+                        <span class="material-symbols-outlined text-xl">rocket_launch</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateFileName(input) {
+            const fileName = input.files[0] ? input.files[0].name : "Haz clic para subir o arrastra un archivo";
+            document.getElementById('fileName').textContent = fileName;
+        }
+    </script>
+}

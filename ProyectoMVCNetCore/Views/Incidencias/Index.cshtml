@@ -1,0 +1,516 @@
+﻿@model List<Incidencia>
+@using System.Security.Claims
+
+@{
+    ViewData["Title"] = "Gestión de Tickets";
+    int userIdRol = int.Parse(User.FindFirstValue("IdRol") ?? "0");
+    int userIdUsuario = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
+    List<Usuario> tecnicos = ViewData["Tecnicos"] as List<Usuario> ?? new List<Usuario>();
+    List<Estado> estados = ViewData["Estados"] as List<Estado> ?? new List<Estado>();
+}
+
+<!-- Top Header & Search -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+    <div>
+        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Panel de Tickets</h2>
+        <p class="text-slate-500 mt-1">Gestión centralizada de incidencias y soporte técnico.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <div class="relative w-64">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+            <input class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" placeholder="Buscar ticket..." type="text" id="ticketSearch" />
+        </div>
+        @if (userIdRol == 3) // Usuario normal puede crear
+        {
+            <a asp-action="Create" class="bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors duration-300">
+                <span class="material-symbols-outlined text-lg">add</span>
+                Nuevo Ticket
+            </a>
+        }
+    </div>
+</div>
+
+<!-- Main Layout Switch -->
+@if (userIdRol == 3)
+{
+    <!-- View for Normal User: Visual Cards (Bento Grid) -->
+    <div class="flex gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide">
+        <button onclick="filterByState(0, event)" class="state-filter-btn whitespace-nowrap px-6 py-2.5 rounded-2xl font-bold text-sm transition-all duration-300 active:scale-95 bg-slate-900 text-white shadow-lg shadow-slate-200 border border-transparent" data-state="0">Todos mis tickets</button>
+        @foreach (var est in estados)
+        {
+            <button onclick="filterByState(@est.IdEstado, event)" class="state-filter-btn whitespace-nowrap px-6 py-2.5 rounded-2xl font-bold text-sm transition-all duration-300 active:scale-95 bg-white text-slate-500 shadow-sm border border-slate-200 hover:border-slate-300 hover:bg-slate-50" data-state="@est.IdEstado">
+                @est.NombreEstado
+            </button>
+        }
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="ticketsGrid">
+        @foreach (var item in Model)
+        {
+            var estadoName = estados.FirstOrDefault(e => e.IdEstado == item.IdEstado)?.NombreEstado ?? "Pendiente";
+            var isPendiente = item.IdEstado == 1;
+            var isEnProceso = item.IdEstado == 2;
+            var colorClass = isPendiente ? "text-amber-500 bg-amber-50 border-amber-100" : isEnProceso ? "text-primary bg-primary/10 border-primary/20" : "text-emerald-500 bg-emerald-50 border-emerald-100";
+            var iconClass = isPendiente ? "timer" : isEnProceso ? "bolt" : "check_circle";
+
+            <a href="/Incidencias/Details/@item.IdIncidencia" class="ticket-card bento-card block p-6 rounded-3xl hover:-translate-y-1 hover:shadow-2xl hover:shadow-slate-200 transition-all duration-300 bg-white border border-black/5 group cursor-pointer" data-state="@item.IdEstado" data-title="@item.Titulo.ToLower()" data-desc="@item.Descripcion.ToLower()" data-id="@item.IdIncidencia">
+                <div class="flex justify-between items-start mb-5">
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center @colorClass group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-2xl">@iconClass</span>
+                    </div>
+                    <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border @colorClass">@estadoName</span>
+                </div>
+                
+                <h3 class="text-xl font-extrabold text-slate-900 mb-2 line-clamp-1 group-hover:text-primary transition-colors">@item.Titulo</h3>
+                <p class="text-sm text-slate-500 line-clamp-2 mb-6 h-10 leading-relaxed">@item.Descripcion</p>
+                
+                <div class="pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[16px]">calendar_today</span>
+                        @item.FechaReporte.ToString("dd MMM yyyy")
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[16px]">tag</span>
+                        @item.IdIncidencia
+                    </div>
+                </div>
+            </a>
+        }
+        
+        @if (!Model.Any())
+        {
+            <div class="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+                <div class="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <span class="material-symbols-outlined text-4xl text-slate-300">inbox</span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900">No tienes tickets</h3>
+                <p class="text-slate-500 mt-1 mb-6">Cuando crees una nueva incidencia aparecerá aquí.</p>
+                <a href="/Incidencias/Create" class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold text-sm rounded-xl hover:bg-primary/90 transition-colors">
+                    <span class="material-symbols-outlined">add</span>
+                    Crear mi primer ticket
+                </a>
+            </div>
+        }
+    </div>
+}
+else
+{
+<!-- Bento Layout for Admins/Tecnicos -->
+<div class="grid grid-cols-12 gap-8">
+    <!-- Large Central Bento Card: Ticket List -->
+    <div class="order-2 lg:order-1 col-span-12 lg:col-span-9 bento-card rounded-3xl p-1 shadow-sm">
+        <div class="bg-white rounded-[1.4rem]">
+            <div class="px-8 py-6 border-b border-black/10 flex items-center justify-between rounded-t-[1.4rem]">
+                <h3 class="text-lg font-extrabold text-slate-900">Incidencias Recientes</h3>
+                <div class="relative">
+                    <button onclick="toggleFilterMenu(event)" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                        <span class="material-symbols-outlined">filter_list</span>
+                    </button>
+                    <!-- Advanced Filter Dropdown -->
+                    <div id="filterMenu" style="overscroll-behavior: contain;" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-3xl shadow-2xl border border-black/5 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div class="p-5 border-b border-slate-100 bg-slate-50/50">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros Avanzados</h4>
+                        </div>
+                        <div class="p-5 space-y-6">
+                            @if (userIdRol == 2) // Solo para Técnicos
+                            {
+                                <div>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Asignación</p>
+                                    <div class="space-y-1">
+                                        <button onclick="setAssignmentFilter('all')" class="assignment-btn w-full text-left px-4 py-2.5 text-[11px] font-bold text-primary bg-primary/5 rounded-xl flex items-center justify-between group transition-all">
+                                            <div class="flex items-center gap-3">
+                                                <span class="material-symbols-outlined text-lg">apps</span>
+                                                Todos los tickets
+                                            </div>
+                                            <span class="material-symbols-outlined text-sm opacity-100 check-icon">check</span>
+                                        </button>
+                                        
+                                        <button onclick="setAssignmentFilter('mine')" class="assignment-btn w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center justify-between group transition-all">
+                                            <div class="flex items-center gap-3">
+                                                <span class="material-symbols-outlined text-lg">person</span>
+                                                Asignados a mí
+                                            </div>
+                                            <span class="material-symbols-outlined text-sm opacity-0 check-icon">check</span>
+                                        </button>
+
+                                        <button onclick="setAssignmentFilter('unassigned')" class="assignment-btn w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl flex items-center justify-between group transition-all">
+                                            <div class="flex items-center gap-3">
+                                                <span class="material-symbols-outlined text-lg">person_off</span>
+                                                Sin asignar
+                                            </div>
+                                            <span class="material-symbols-outlined text-sm opacity-0 check-icon">check</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+
+                            <div>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Rango de Fecha</p>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <span class="text-[8px] font-black text-slate-400 uppercase ml-1">Desde</span>
+                                        <input type="date" id="dateFrom" onchange="applyFilters()" class="w-full text-[10px] font-bold p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white transition-all" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <span class="text-[8px] font-black text-slate-400 uppercase ml-1">Hasta</span>
+                                        <input type="date" id="dateTo" onchange="applyFilters()" class="w-full text-[10px] font-bold p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white transition-all" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onclick="resetAdvancedFilters()" class="w-full py-3 mt-2 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100">
+                                Limpiar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-black/[0.02]">
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">TITULO</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">FECHA</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">ESTADO</th>
+                            <th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-black/10">
+                        @foreach (var item in Model)
+                        {
+                            <tr class="hover:bg-slate-50/30 transition-colors group" 
+                                data-tecnico="@(item.IdUsuarioTecnico?.ToString() ?? "0")" 
+                                data-cliente="@item.IdUsuarioCliente"
+                                data-fecha="@item.FechaReporte.ToString("yyyy-MM-dd")">
+                                <td class="px-8 py-6 text-sm font-bold text-slate-400">#@item.IdIncidencia</td>
+                                <td class="px-8 py-6">
+                                    <p class="text-sm font-bold text-slate-800">@item.Titulo</p>
+                                    <p class="text-xs text-slate-400 max-w-xs truncate">@item.Descripcion</p>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <p class="text-xs font-bold text-slate-700">@item.FechaReporte.ToString("dd MMM, yyyy").Replace(".", "")</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5">@item.FechaReporte.ToString("HH:mm")</p>
+                                </td>
+                                <td class="px-8 py-6 text-center">
+                                    @{
+                                        var estadoName = estados.FirstOrDefault(e => e.IdEstado == item.IdEstado)?.NombreEstado ?? "Pendiente";
+                                        var colorClass = item.IdEstado == 1 ? "bg-amber-50 text-amber-600 border-amber-100" : item.IdEstado == 2 ? "bg-primary/10 text-primary border-primary/20" : "bg-emerald-50 text-emerald-600 border-emerald-100";
+                                    }
+                                    <span class="px-3 py-1 text-[10px] font-bold rounded-full border @colorClass uppercase tracking-wider whitespace-nowrap">
+                                        @estadoName
+                                    </span>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if (userIdRol == 1 && item.IdUsuarioTecnico == null && item.IdEstado != 3)
+                                        {
+                                            <form asp-action="AsignarTecnico" method="post" class="flex gap-2 items-center bg-slate-50 p-1 rounded-xl border border-slate-100">
+                                                <input type="hidden" name="idIncidencia" value="@item.IdIncidencia" />
+                                                <select name="idTecnico" class="text-[10px] font-bold bg-transparent border-none py-1 pl-2 pr-6 focus:ring-0 cursor-pointer" required>
+                                                    <option value="" disabled selected>Sin asignar</option>
+                                                    @foreach (var tec in tecnicos)
+                                                    {
+                                                        <option value="@tec.IdUsuario">@tec.Nombre</option>
+                                                    }
+                                                </select>
+                                                <button type="submit" class="p-1.5 text-primary hover:bg-white rounded-lg transition-all shadow-sm">
+                                                    <span class="material-symbols-outlined text-sm">person_add</span>
+                                                </button>
+                                            </form>
+                                        }
+                                        
+                                        @if (userIdRol == 2 && item.IdUsuarioTecnico == null && item.IdEstado != 3)
+        {
+            <form asp-action="AtenderTicket" method="post">
+                <input type="hidden" name="idIncidencia" value="@item.IdIncidencia" />
+                <button type="submit" class="p-2 text-primary hover:bg-primary/5 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[10px] uppercase">
+                    <span class="material-symbols-outlined text-sm">check_circle</span>
+                    Atender
+                </button>
+            </form>
+        }
+
+                                        <a asp-action="Details" asp-route-id="@item.IdIncidencia" class="w-9 h-9 inline-flex items-center justify-center rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary transition-all">
+                                            <span class="material-symbols-outlined text-[20px] leading-none">visibility</span>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="px-8 py-12 text-center text-slate-400 italic text-sm">
+                                    No se encontraron incidencias
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side Card -->
+    <div class="order-1 lg:order-2 col-span-12 lg:col-span-3">
+        <div class="bento-card rounded-3xl p-8 shadow-sm h-full flex flex-col">
+            <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6 px-1">Filtros de Estado</h4>
+            
+            <div class="space-y-2 flex-1">
+                <!-- Main Filter: Todas -->
+                <button onclick="filterByState(0, event)" class="state-filter-btn w-full text-left px-5 py-3.5 rounded-2xl bg-primary text-white font-bold text-xs flex items-center justify-between transition-all shadow-lg shadow-primary/20 active:scale-95 group" data-state="0">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-sm transition-colors @(true ? "" : "text-slate-400")">dashboard_customize</span>
+                        Todas las Incidencias
+                    </div>
+                </button>
+                
+                <!-- Sub-options for States -->
+                <div class="ml-4 pl-4 border-l border-black/10 mt-2 space-y-1">
+                    @foreach (var est in estados)
+                    {
+                        <button onclick="filterByState(@est.IdEstado, event)" class="state-filter-btn w-full text-left px-4 py-2.5 rounded-xl text-black/50 font-bold text-[11px] flex items-center justify-between transition-all border border-transparent active:scale-95 group" data-state="@est.IdEstado">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-sm text-inherit opacity-70">
+                                    @(est.IdEstado == 1 ? "timer" : est.IdEstado == 2 ? "bolt" : "check_circle")
+                                </span>
+                                @est.NombreEstado
+                            </div>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Help Box: Dark Premium Style -->
+            @*<div class="mt-12 bg-slate-900 rounded-[2.5rem] p-10 text-center relative overflow-hidden group shadow-2xl shadow-slate-200">
+                <div class="relative z-10">
+                    <div class="w-14 h-14 bg-white/10 rounded-[1.2rem] flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 will-change-transform origin-center">
+                        <span class="material-symbols-outlined text-primary text-3xl select-none">headset_mic</span>
+                    </div>
+                    <p class="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-3">¿Necesitas ayuda? </p>
+                    <p class="text-xs text-slate-300 font-medium leading-relaxed mb-8 px-2">
+                        Inicia una solicitud y nuestro equipo te ayudará.
+                    </p>
+                    <a asp-action="Create" class="w-full inline-block py-4 bg-primary text-white text-[10px] font-black uppercase tracking-[0.15em] rounded-2xl hover:brightness-110 transition-all shadow-xl shadow-primary/25 active:scale-95">
+                        Abrir Incidencia
+                    </a>
+                </div>
+                <!-- Decorative Glows -->
+                <div class="absolute -right-16 -top-16 w-40 h-40 bg-primary/10 rounded-full blur-[60px]"></div>
+                <div class="absolute -left-16 -bottom-16 w-40 h-40 bg-primary/20 rounded-full blur-[80px]"></div>
+            </div>*@
+
+        </div>
+    </div>
+</div>
+}
+
+@section Scripts {
+    <script>
+        let currentActiveStateId = 0;
+        let currentAssignmentFilter = 'all';
+        const currentUserId = "@userIdUsuario";
+
+        function toggleFilterMenu(e) {
+            e.stopPropagation();
+            document.getElementById('filterMenu').classList.toggle('hidden');
+        }
+
+        function setAssignmentFilter(filter) {
+            currentAssignmentFilter = filter;
+            
+            document.querySelectorAll('.assignment-btn').forEach(btn => {
+                const isSelected = btn.getAttribute('onclick').includes(`'${filter}'`);
+                const check = btn.querySelector('.check-icon');
+                
+                if (isSelected) {
+                    btn.classList.add('text-primary', 'bg-primary/5');
+                    btn.classList.remove('text-slate-600', 'hover:bg-slate-50');
+                    check.classList.remove('opacity-0');
+                    check.classList.add('opacity-100');
+                } else {
+                    btn.classList.remove('text-primary', 'bg-primary/5');
+                    btn.classList.add('text-slate-600', 'hover:bg-slate-50');
+                    check.classList.add('opacity-0');
+                    check.classList.remove('opacity-100');
+                }
+            });
+
+            applyFilters();
+        }
+
+        function resetAdvancedFilters() {
+            currentAssignmentFilter = 'all';
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            
+            // UI Reset Assignment
+            document.querySelectorAll('.assignment-btn').forEach((btn, idx) => {
+                const check = btn.querySelector('.check-icon');
+                if (idx === 0) { // All
+                    btn.classList.add('text-primary', 'bg-primary/5');
+                    btn.classList.remove('text-slate-600', 'hover:bg-slate-50');
+                    check?.classList.replace('opacity-0', 'opacity-100');
+                } else {
+                    btn.classList.remove('text-primary', 'bg-primary/5');
+                    btn.classList.add('text-slate-600', 'hover:bg-slate-50');
+                    check?.classList.replace('opacity-100', 'opacity-0');
+                }
+            });
+
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const term = document.getElementById('ticketSearch').value.toLowerCase();
+            const dateFrom = document.getElementById('dateFrom') ? document.getElementById('dateFrom').value : '';
+            const dateTo = document.getElementById('dateTo') ? document.getElementById('dateTo').value : '';
+            
+            // Logica para Tabla (Admin/Tecnico)
+            const rows = document.querySelectorAll('tbody tr');
+            if (rows.length > 0) {
+                const activeBtn = document.querySelector('.state-filter-btn.bg-primary:not(.whitespace-nowrap)');
+                const targetStateName = activeBtn ? activeBtn.innerText.replace(/dashboard_customize|timer|bolt|check_circle/g, '').trim().toLowerCase() : "";
+
+                rows.forEach(row => {
+                    if (row.cells.length < 2) return;
+
+                    const title = row.querySelector('p.font-bold')?.textContent.toLowerCase() || "";
+                    const desc = row.querySelector('p.text-xs')?.textContent.toLowerCase() || "";
+                    const id = row.querySelector('td:first-child')?.textContent.toLowerCase() || "";
+                    const rowDate = row.getAttribute('data-fecha');
+                    
+                    const badge = row.querySelector('span.px-3');
+                    const rowStateName = badge ? badge.textContent.trim().toLowerCase() : "";
+
+                    const tecnicoId = row.getAttribute('data-tecnico');
+                    let matchesAssignment = true;
+                    if (currentAssignmentFilter === 'mine') {
+                        matchesAssignment = (tecnicoId === currentUserId);
+                    } else if (currentAssignmentFilter === 'unassigned') {
+                        matchesAssignment = (tecnicoId === "0");
+                    }
+
+                    let matchesDate = true;
+                    if (dateFrom && rowDate < dateFrom) matchesDate = false;
+                    if (dateTo && rowDate > dateTo) matchesDate = false;
+
+                    const matchesSearch = title.includes(term) || desc.includes(term) || id.includes(term);
+                    const matchesState = (currentActiveStateId === 0 || rowStateName === targetStateName || targetStateName.includes(rowStateName));
+
+                    if (matchesSearch && matchesState && matchesAssignment && matchesDate) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            // Logica para Tarjetas (Usuario Normal)
+            const cards = document.querySelectorAll('.ticket-card');
+            if (cards.length > 0) {
+                cards.forEach(card => {
+                    const title = card.getAttribute('data-title');
+                    const desc = card.getAttribute('data-desc');
+                    const id = card.getAttribute('data-id');
+                    const cardState = card.getAttribute('data-state');
+                    
+                    const matchesSearch = title.includes(term) || desc.includes(term) || id.includes(term);
+                    const matchesState = (currentActiveStateId === 0 || parseInt(cardState) === currentActiveStateId);
+                    
+                    if (matchesSearch && matchesState) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        // Cerrar menú al hacer clic fuera
+        window.onclick = function(event) {
+            const menu = document.getElementById('filterMenu');
+            if (menu && !menu.classList.contains('hidden') && !event.target.closest('.relative')) {
+                menu.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('ticketSearch').addEventListener('input', applyFilters);
+
+        function filterByState(stateId, e = null) {
+            currentActiveStateId = stateId;
+
+            document.querySelectorAll('.state-filter-btn').forEach(btn => {
+                if (btn.classList.contains('whitespace-nowrap')) {
+                    // Pill Style (Cards)
+                    btn.classList.remove('bg-slate-900', 'text-white', 'shadow-lg', 'border-transparent', 'shadow-slate-200');
+                    btn.classList.add('bg-white', 'text-slate-500', 'shadow-sm', 'border-slate-200', 'hover:border-slate-300', 'hover:bg-slate-50');
+                } else {
+                    // Sidebar Style (Table)
+                    btn.classList.remove('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
+                    btn.classList.add('text-slate-500');
+                    btn.classList.remove('bg-primary/10', 'hover:bg-slate-50', 'hover:bg-black/5');
+                }
+            });
+
+            const currentBtn = e ? e.currentTarget : document.querySelector(`.state-filter-btn[data-state="${stateId}"]`);
+            if (currentBtn) {
+                if (currentBtn.classList.contains('whitespace-nowrap')) {
+                    // Pill Style
+                    currentBtn.classList.add('bg-slate-900', 'text-white', 'shadow-lg', 'border-transparent', 'shadow-slate-200');
+                    currentBtn.classList.remove('bg-white', 'text-slate-500', 'shadow-sm', 'border-slate-200', 'hover:border-slate-300', 'hover:bg-slate-50');
+                } else {
+                    // Sidebar Style
+                    currentBtn.classList.add('bg-primary', 'text-white', 'shadow-lg', 'shadow-primary/20');
+                    currentBtn.classList.remove('text-slate-500', 'bg-primary/10', 'hover:bg-slate-50', 'hover:bg-black/5');
+                }
+            }
+
+            applyFilters();
+        }
+
+        // Session persistence and init
+        window.addEventListener('DOMContentLoaded', () => {
+            const assignment = sessionStorage.getItem('filter_assignment');
+            const state = sessionStorage.getItem('filter_state');
+
+            if (assignment || state) {
+                if (assignment) setAssignmentFilter(assignment);
+                if (state) filterByState(parseInt(state));
+                
+                // Clear to avoid persistent filtering on normal visits
+                sessionStorage.removeItem('filter_assignment');
+                sessionStorage.removeItem('filter_state');
+            } else {
+                applyFilters(); // Initial draw if no intent found
+            }
+        });
+
+        // SIGNALR: Refresh Dashboard Hook para la página de Incidencias
+        if (window.presenceConnection) {
+            window.presenceConnection.on("RefreshDashboard", function() {
+                fetch(window.location.href)
+                    .then(res => res.text())
+                    .then(html => {
+                        let parser = new DOMParser();
+                        let doc = parser.parseFromString(html, 'text/html');
+                        
+                        // Vista Usuarios: Grid Bento
+                        let currentGrid = document.getElementById('ticketsGrid');
+                        let newGrid = doc.getElementById('ticketsGrid');
+                        if (currentGrid && newGrid) currentGrid.innerHTML = newGrid.innerHTML;
+
+                        // Vista Admins/Tecnicos: Grid Layout (Tabla de tickets)
+                        let currentAdminGrid = document.querySelector('.grid.grid-cols-12.gap-8');
+                        let newAdminGrid = doc.querySelector('.grid.grid-cols-12.gap-8');
+                        if (currentAdminGrid && newAdminGrid) currentAdminGrid.innerHTML = newAdminGrid.innerHTML;
+
+                        // Reaplicar los filtros si el usuario tenía el input de búsqueda o filtros activos
+                        applyFilters();
+                    })
+                    .catch(err => console.error("Error updating incidencias view:", err));
+            });
+        }
+    </script>
+}
